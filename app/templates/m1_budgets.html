@@ -1,4 +1,54 @@
 {% extends "base.html" %}{% block content %}
 <div class="grid module-1"><section class="panel panel--primary"><div class="panel__head"><h2>预算采信记录</h2><span class="panel__meta">M1 · {{ data.status|default('READY') }}</span></div><div class="panel__body panel__body--scroll"><table class="ledger"><thead><tr><th>字段</th><th>值</th><th>证据</th></tr></thead><tbody>{% for key, value in data.items() %}<tr><td>{{ key }}</td><td class="num">{{ value }}</td><td>R{{ loop.index }}</td></tr>{% endfor %}</tbody></table></div></section>
 <div class="stack"><section class="panel"><div class="panel__head"><h2>原因码</h2><span class="panel__meta">{{ data.reason|default('OK') }}</span></div><div class="panel__body bars"><i style="--v:29%"></i><i style="--v:62%"></i></div></section><section class="panel"><div class="panel__head"><h2>本次动作</h2><span class="panel__meta">/api/budgets/import</span></div><div class="panel__body"><button class="btn btn--primary" data-endpoint="/api/budgets/import">运行 预算采信</button><pre class="result">等待运行</pre></div></section></div></div>
+
+<div id="mergers" class="merger">
+<header class="merger__head"><h2>合并映射与批次采信</h2><span class="panel__meta">M7 · 预算导入与权重测算绑定同一映射版本</span>
+  <button class="btn" id="m7-refresh">刷新台账</button>
+</header>
+
+<div class="merger__grid">
+<section class="panel"><div class="panel__head"><h2>① 登记带生效批次的合并映射</h2><span class="panel__meta">/api/mergers/mappings/register</span></div>
+<div class="panel__body">
+<form id="m7-register-form" class="form">
+<label>生效批次 <input name="effective_batch" value="2026-11" required></label>
+<label>期望最新版本号(乐观锁) <input name="expected_version" placeholder="留空跳过校验"></label>
+<label>请求幂等键 <input name="request_key" placeholder="重试同键不重复入账"></label>
+<label class="form__wide">备注 <input name="note" value="编码换版合并登记"></label>
+<label class="form__check"><input type="checkbox" name="simulate_interrupt"> 模拟切换中断（落 INTERRUPTED，验证可恢复）</label>
+<fieldset class="form__wide"><legend>映射行 JSON（同号重复将隔离）</legend><textarea name="entries" rows="9">[{"old_code":"000101","old_entity":"城北公路段","new_code":"X2026001","new_entity":"市政交通中心","weight":"2"},{"old_code":"000102","old_entity":"城南养护站","new_code":"X2026001","new_entity":"市政交通中心","weight":"1"},{"old_code":"9007199254740993","old_entity":"桥隧所","new_code":"X2026002","new_entity":"市政交通中心","weight":"1"},{"old_code":"000101","old_entity":"重复主体","new_code":"X2026009","new_entity":"其他","weight":"1"}]</textarea></fieldset>
+<div class="form__actions"><button class="btn btn--primary" type="submit">登记并发布</button>
+<button class="btn" id="m7-recover" type="button">恢复中断切换</button></div>
+</form><pre class="result" id="m7-register-out">等待登记</pre></div></section>
+
+<section class="panel"><div class="panel__head"><h2>② 映射版本台账</h2><span class="panel__meta">同号不同批次可属不同主体</span></div>
+<div class="panel__body panel__body--scroll"><table class="ledger"><thead><tr><th>版本</th><th>生效批次</th><th>状态</th><th>有效/隔离</th><th>摘要</th></tr></thead>
+<tbody id="m7-versions"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody></table></div></section>
+</div>
+
+<div class="merger__grid">
+<section class="panel"><div class="panel__head"><h2>③ 预算采信（旧补传认领原主体 / 新申报归集新编码）</h2><span class="panel__meta">/api/mergers/budgets/import</span></div>
+<div class="panel__body">
+<form id="m7-import-form" class="form">
+<label>业务批次 <input name="batch" value="2026-11" required></label>
+<label>指定映射版本ID <input name="mapping_version_id" placeholder="留空按批次解析；旧批次重跑填历史ID"></label>
+<label>请求幂等键 <input name="request_key" placeholder="同键重试不重复入账"></label>
+<fieldset class="form__wide"><legend>预算行 JSON（保留 cap_source 封顶来源）</legend><textarea name="rows" rows="8">[{"project_id":"000101","amount":"1,200.50","unit":"元","weight":"2","cap":"900","cap_source":"000101-本级批复"},{"project_id":"000102","amount":"800.00","unit":"元","weight":"1","cap":"700","cap_source":"000102-专项补助"},{"project_id":"9007199254740993","amount":"0.08","unit":"万元","weight":"1","cap":"800"},{"project_id":"GHOST","amount":"50.00","unit":"元","weight":"1","cap":"50"}]</textarea></fieldset>
+<div class="form__actions"><button class="btn btn--primary" type="submit">采信入账</button></div>
+</form><pre class="result" id="m7-import-out">等待采信</pre></div></section>
+
+<section class="panel"><div class="panel__head"><h2>④ 权重测算（与采信绑定同版本）</h2><span class="panel__meta">/api/mergers/weights/calculate</span></div>
+<div class="panel__body">
+<form id="m7-weight-form" class="form">
+<label>业务批次 <input name="batch" value="2026-11"></label>
+<label>映射版本ID <input name="mapping_version_id" placeholder="留空按批次解析"></label>
+<label>导入单号 <input name="import_id" placeholder="留空按登记权重测算"></label>
+<div class="form__actions"><button class="btn btn--primary" type="submit">测算权重</button></div>
+</form><pre class="result" id="m7-weight-out">等待测算</pre></div></section>
+</div>
+
+<section class="panel panel--primary"><div class="panel__head"><h2>⑤ 合并前后归属与权重追查</h2><span class="panel__meta">原项目金额与封顶来源逐行保留 · 冲突隔离不占有效合计</span></div>
+<div class="panel__body panel__body--scroll"><div id="m7-trace">加载中…</div></div></section>
+</div>
+<script src="/static/mergers.js"></script>
 {% endblock %}

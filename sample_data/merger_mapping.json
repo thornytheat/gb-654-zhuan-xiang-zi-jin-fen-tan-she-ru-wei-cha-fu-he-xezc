@@ -1,0 +1,9 @@
+{
+  "effective_batch": "2026-11",
+  "note": "编码换版合并登记样例",
+  "entries": [
+    {"old_code": "000101", "old_entity": "城北公路段", "new_code": "X2026001", "new_entity": "市政交通中心", "weight": "2", "cap_source": "000101-本级批复"},
+    {"old_code": "000102", "old_entity": "城南养护站", "new_code": "X2026001", "new_entity": "市政交通中心", "weight": "1", "cap_source": "000102-专项补助"},
+    {"old_code": "9007199254740993", "old_entity": "桥隧所", "new_code": "X2026002", "new_entity": "市政交通中心", "weight": "1", "cap_source": "桥隧所-历史批复"}
+  ]
+}
